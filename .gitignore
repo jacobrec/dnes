@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+dnes.so
+dnes.dylib
+dnes.dll
+dnes.a
+dnes.lib
+dnes-test-*
+dnes
+*.exe
+*.o
+*.obj
+*.lst
+roms/smb3.nes
+docs/

@@ -1,0 +1,9 @@
+{
+	"name": "dnes",
+	"authors": [
+		"Jacob Reckhard"
+	],
+	"description": "A NES emulator written in D",
+	"copyright": "Copyright © 2018, Jacob Reckhard",
+	"license": "MIT"
+}
