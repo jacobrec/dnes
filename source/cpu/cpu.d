@@ -2,7 +2,8 @@ module cpu.cpu;
 import nes;
 
 import std.stdio : writeln, writef;
-import std.conv : text;
+import std.format: format;
+import std.conv : text, to;
 import std.container : DList;
 
 // CPU {{{
@@ -33,7 +34,8 @@ class CPU {
         SIGN
     }
     enum Mem {
-        Immediate,
+        IMMEDIATE,
+        ABSOLUTE,
     }
 
     ushort pc; // The program counter
@@ -58,6 +60,7 @@ class CPU {
     void doMicroOp() {
         this.opline.front()();
         this.opline.removeFront();
+        this.cycles++;
     }
 
     bool hasMicroOp() {
@@ -79,9 +82,11 @@ class CPU {
         this.X = 0;
         this.Y = 0;
         this.pc = 0;
+        this.sp = 255;
 
         //TODO: make this an interrupt
         this.pc = read16(system.access(0xFFFC));
+        this.pc = 0xC000;
         writef("Starting at: 0x%X\n", this.pc);
     }
 
@@ -93,33 +98,64 @@ class CPU {
     }
 
     ubyte nextOp(){
+        debug ops ~= format("%.2X ", *system.access(this.pc));
         return *system.access(this.pc++);
     }
 
+    bool first = true;
+    string regs;
+    string ops;
+    string disassemble;
     void readInstruction() {
-
+        debug{
+            if(!first){
+                writef(rightPad(ops, 10));
+                writef(rightPad(disassemble, 32));
+                writef(regs);
+            }
+            regs = format("A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X CYC:%3d\n", A, X, Y, CCR, sp, cycles*3);
+            first = false;
+            ops = "";
+            disassemble = "";
+            writef("%X  ", this.pc);
+        }
         ubyte op = nextOp();
-        writef("Instruction: 0x%X. PC: %X\n", op, this.pc-1);
+
+
 
         switch (op) {
+        case 0x4C: // (76) JMP #addr
+            debug disassemble ~= "JMP";
+            this.jump(Mem.IMMEDIATE);
+            break;
         case 0x78: // (120) SEI
+            debug disassemble ~= "SEI";
             this.addMicroOp({ setStatus(CC.INTERRUPT, true); });
             break;
         case 0x9A: // (154) TXS
+            debug disassemble ~= "TXS";
             this.addMicroOp({ this.sp = this.X; });
             break;
         case 0xA2: // (162) LDX #Oper
-            this.load(&this.X, Mem.Immediate);
+            debug disassemble ~= "LDX";
+            this.load(&this.X, Mem.IMMEDIATE);
             break;
         case 0xA9: // (169) LDA #Oper
-            this.load(&this.A, Mem.Immediate);
+            debug disassemble ~= "LDA";
+            this.load(&this.A, Mem.IMMEDIATE);
+            break;
+        case 0xAD: // (173) LDA absolute
+            debug disassemble ~= "LDA";
+            this.load(&this.A, Mem.ABSOLUTE);
             break;
         case 0xD8: // (216) CLD
+            debug disassemble ~= "CLD";
             this.addMicroOp({ setStatus(CC.DECIMAL, false); });
             break;
         default:
             writef("Unimplemented Instruction: 0x%X. PC: %X\n", op, this.pc-1);
             writeln(this);
+
             assert(0);
         }
     }
@@ -134,10 +170,39 @@ class CPU {
         this.CCR |= 0b00100000;
     }
 
+    void jump(Mem type){
+        final switch(type){
+            case Mem.IMMEDIATE:
+                debug disassemble ~= " #$" ~ format("%.2X%.2X", 
+                        (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
+                ushort addr = 0;
+                this.addMicroOp({ addr |= nextOp(); });
+                this.addMicroOp({ addr |= (nextOp() << 8); this.pc = addr; });
+                break;
+            case Mem.ABSOLUTE:
+                ushort addr = 0;
+                debug disassemble ~= " $" ~ format("%.2X%.2X", 
+                        (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
+                this.addMicroOp({ addr |= nextOp(); });
+                this.addMicroOp({ addr |= (nextOp() << 8); });
+                this.addMicroOp({ this.pc |= *this.system.access(addr); });
+                break;
+        }
+    }
+
     void load(ubyte* loc, Mem type){
         final switch(type){
-            case Mem.Immediate:
+            case Mem.IMMEDIATE:
+                debug disassemble ~= " #$" ~ format("%.2X", (*system.access(this.pc)));
                 this.addMicroOp({ *loc = nextOp(); });
+                break;
+            case Mem.ABSOLUTE:
+                ushort addr = 0;
+                debug disassemble ~= " $" ~ format("%.2X%.2X", 
+                        (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
+                this.addMicroOp({ addr |= nextOp(); });
+                this.addMicroOp({ addr |= (nextOp() << 8); });
+                this.addMicroOp({ *loc |= *this.system.access(addr); });
                 break;
         }
     }
@@ -218,6 +283,10 @@ class CPU {
     // }}}
 }
 // }}}
+
+string rightPad(string inp, int len){
+    return (inp ~ "                                      ")[0..len];
+}
 
 // CCR test {{{
 unittest {
