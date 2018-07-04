@@ -12,9 +12,9 @@ import std.container : DList;
 // CPU {{{
 class CPU {
     // Data {{{
-    byte A; // Accumulator
-    byte X; // X index
-    byte Y; // Y index
+    ubyte A; // Accumulator
+    ubyte X; // X index
+    ubyte Y; // Y index
 
     // Bit order is 76543210
     //              NV BDIZC
@@ -26,7 +26,7 @@ class CPU {
     // ( ) unused, should be 1 at all times
     // O(V)erflow
     // (N)egative flag, set is negative
-    byte CCR; // Status Register
+    ubyte CCR; // Status Register
     enum CC {
         CARRY = 0,
         ZERO,
@@ -49,7 +49,7 @@ class CPU {
 
     ulong cycles; // Consumed cpu cycles
 
-    ubyte[800] ram;
+    ubyte[0x800] ram;
 
     NES system;
 
@@ -98,17 +98,22 @@ class CPU {
         this.CCR |= 0b00100000;
     }
 
-    void setZeroNegIf(byte val) {
+    void setStatus(ubyte val) {
+        this.CCR = val;
+        this.CCR |= 0b00100000;
+    }
+
+    void setZeroNegIf(ubyte val) {
         this.setZeroIf(val);
         this.setNegIf(val);
     }
 
-    void setZeroIf(byte val) {
+    void setZeroIf(ubyte val) {
         this.setStatus(CC.ZERO, val == 0);
     }
 
-    void setNegIf(byte val) {
-        this.setStatus(CC.NEGATIVE, val < 0);
+    void setNegIf(ubyte val) {
+        this.setStatus(CC.NEGATIVE, (val & 0b1000_0000) != 0);
     }
     // }}}
     // System {{{
@@ -135,13 +140,7 @@ class CPU {
         //writef("Starting at: 0x%X\n", this.pc);
     }
 
-    ubyte uNextOp(bool print = true) {
-        if (print)
-            debug ops ~= format("%.2X ", *system.access(this.pc));
-        return *system.access(this.pc++);
-    }
-
-    byte nextOp(bool print = true) {
+    ubyte nextOp(bool print = true) {
         if (print)
             debug ops ~= format("%.2X ", *system.access(this.pc));
         return *system.access(this.pc++);
@@ -167,7 +166,7 @@ class CPU {
             disassemble = "";
             writef("%X  ", this.pc);
         }
-        ubyte op = cast(ubyte) uNextOp();
+        ubyte op = cast(ubyte) nextOp();
 
         switch (op) {
         case 0x08: // (8) PHP - implied
@@ -210,6 +209,10 @@ class CPU {
             debug disassemble ~= "SEC";
             this.addMicroOp({ setStatus(CC.CARRY, true); });
             break;
+        case 0x40: // (64) RTI - implied
+            debug disassemble ~= "RTI";
+            this.returnFromInterrupt();
+            break;
         case 0x48: // (72) PHA - implied
             debug disassemble ~= "PHA";
             this.push(&this.A);
@@ -234,6 +237,10 @@ class CPU {
             debug disassemble ~= "PLA";
             this.pop(&this.A);
             break;
+        case 0x69: // (105) ADC - immediate
+            debug disassemble ~= "ADC";
+            this.add(&this.A, Mem.IMMEDIATE);
+            break;
         case 0x70: // (112) BVS - relative
             debug disassemble ~= "BVS";
             this.branchIf(CC.OVERFLOW, /+isSet+/ true);
@@ -250,25 +257,61 @@ class CPU {
             debug disassemble ~= "STX";
             this.store(&this.X, Mem.ZEROPAGE);
             break;
+        case 0x88: // (136) DEY - implied
+            debug disassemble ~= "DEY";
+            this.increment(&this.Y, -1);
+            break;
+        case 0x8A: // (138) TXA - implied
+            debug disassemble ~= "TXA";
+            this.transfer(&this.X, &this.A);
+            break;
+        case 0x8E: // (142) STX - absolute
+            debug disassemble ~= "STX";
+            this.store(&this.X, Mem.ABSOLUTE);
+            break;
         case 0x90: // (144) BCC - relative
             debug disassemble ~= "BCC";
             this.branchIf(CC.CARRY, /+isSet+/ false);
+            break;
+        case 0x98: // (152) TYA - implied
+            debug disassemble ~= "TYA";
+            this.transfer(&this.Y, &this.A);
             break;
         case 0x9A: // (154) TXS - implied
             debug disassemble ~= "TXS";
             this.addMicroOp({ this.sp = this.X; });
             break;
+        case 0xA0: // (160) LDY - immediate
+            debug disassemble ~= "LDY";
+            this.load(&this.Y, Mem.IMMEDIATE);
+            break;
         case 0xA2: // (162) LDX - immediate
             debug disassemble ~= "LDX";
             this.load(&this.X, Mem.IMMEDIATE);
+            break;
+        case 0xA8: // (168) TAY - implied
+            debug disassemble ~= "TAY";
+            this.transfer(&this.A, &this.Y);
             break;
         case 0xA9: // (169) LDA - immediate
             debug disassemble ~= "LDA";
             this.load(&this.A, Mem.IMMEDIATE);
             break;
+        case 0xAA: // (170) TAX - implied
+            debug disassemble ~= "TAX";
+            this.transfer(&this.A, &this.X);
+            break;
         case 0xAD: // (173) LDA - absolute
             debug disassemble ~= "LDA";
             this.load(&this.A, Mem.ABSOLUTE);
+            break;
+        case 0xAE: // (174) LDX - absolute
+            debug disassemble ~= "LDX";
+            this.load(&this.X, Mem.ABSOLUTE);
+            break;
+        case 0xBA: // (1186) TSX - implied
+            debug disassemble ~= "TSX";
+            this.transfer(&this.sp, &this.X);
             break;
         case 0xB0: // (176) BCS - relative
             debug disassemble ~= "BCS";
@@ -278,9 +321,21 @@ class CPU {
             debug disassemble ~= "CLV";
             this.addMicroOp({ setStatus(CC.OVERFLOW, false); });
             break;
+        case 0xC0: // (192) CPY - immediate
+            debug disassemble ~= "CPY";
+            this.compare(&this.Y, Mem.IMMEDIATE);
+            break;
+        case 0xC8: // (200) INY - implied
+            debug disassemble ~= "INY";
+            this.increment(&this.Y, 1);
+            break;
         case 0xC9: // (201) CMP - immediate
             debug disassemble ~= "CMP";
             this.compare(&this.A, Mem.IMMEDIATE);
+            break;
+        case 0xCA: // (202) DEX - implied
+            debug disassemble ~= "DEX";
+            this.increment(&this.X, -1);
             break;
         case 0xD0: // (208) BNE - relative
             debug disassemble ~= "BNE";
@@ -289,6 +344,18 @@ class CPU {
         case 0xD8: // (216) CLD - implied
             debug disassemble ~= "CLD";
             this.addMicroOp({ setStatus(CC.DECIMAL, false); });
+            break;
+        case 0xE0: // (224) CPX - immediate
+            debug disassemble ~= "CPX";
+            this.compare(&this.X, Mem.IMMEDIATE);
+            break;
+        case 0xE8: // (232) INX - implied
+            debug disassemble ~= "INX";
+            this.increment(&this.X, 1);
+            break;
+        case 0xE9: // (233) SBC - immediate
+            debug disassemble ~= "SBC";
+            this.subtract(&this.A, Mem.IMMEDIATE);
             break;
         case 0xEA: // (234) NOP - implied
             debug disassemble ~= "NOP";
@@ -312,16 +379,26 @@ class CPU {
     // }}}
 
     // Opcode helpers {{{
+    void stackPush(ubyte val) {
+        this.ram[this.sp-- | 0x100] = val;
+    }
+    ubyte stackRead() {
+        return this.ram[this.sp | 0x100];
+    }
 
-    void stackPush(byte val) {
-        this.ram[this.sp--] = val;
+    void returnFromInterrupt() {
+        this.addMicroOp({ this.nextOp(false); });
+        this.addMicroOp({ this.sp++; });
+        this.addMicroOp({ this.setStatus(this.stackRead()); sp++; });
+        this.addMicroOp({ this.pc = (this.pc & 0xFF00) | this.stackRead(); sp++; });
+        this.addMicroOp({ this.pc = (this.pc & 0x00FF) | (this.stackRead() << 8);  });
     }
 
     void returnFromSubroutine() {
         this.addMicroOp({ this.nextOp(false); });
         this.addMicroOp({ this.sp++; });
-        this.addMicroOp({ this.pc = (this.pc & 0xFF00) | this.ram[this.sp++]; });
-        this.addMicroOp({ this.pc = (this.pc & 0x00FF) | (this.ram[this.sp] << 8);  });
+        this.addMicroOp({ this.pc = (this.pc & 0xFF00) | this.stackRead(); sp++; });
+        this.addMicroOp({ this.pc = (this.pc & 0x00FF) | (this.stackRead() << 8);  });
         this.addMicroOp({ this.pc++; });
     }
 
@@ -329,14 +406,14 @@ class CPU {
         debug disassemble ~= " $" ~ format("%.2X%.2X",
                 (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
         ushort addr = 0;
-        this.addMicroOp({ addr |= uNextOp(); });
+        this.addMicroOp({ addr |= nextOp(); });
         this.addMicroOp({ /* none? */ });
-        this.addMicroOp({ this.ram[this.sp--] = ((this.pc & 0xFF00) >> 8); });
-        this.addMicroOp({ this.ram[this.sp--] = (this.pc & 0x00FF); });
-        this.addMicroOp({ addr |= (uNextOp() << 8); this.pc = addr; });
+        this.addMicroOp({ this.stackPush((this.pc & 0xFF00) >> 8); });
+        this.addMicroOp({ this.stackPush(this.pc & 0xFF); });
+        this.addMicroOp({ addr |= (nextOp() << 8); this.pc = addr; });
     }
 
-    void push(byte* loc) {
+    void push(ubyte* loc) {
         // XXX: this seems wrong
         // this.addMicroOp({ nextOp(false); }); // are these supposed to burn a byte
         this.addMicroOp({  }); // or just burn a cycle
@@ -350,13 +427,13 @@ class CPU {
     }
 
 
-    void pop(byte* loc) {
+    void pop(ubyte* loc) {
         // XXX: this seems wrong
         // this.addMicroOp({ nextOp(false); }); // are these supposed to burn a byte
         this.addMicroOp({  }); // or just burn a cycle
         this.addMicroOp({ this.sp++; });
         this.addMicroOp({
-            *loc = this.ram[this.sp];
+            *loc = this.stackRead();
             if (loc == &this.A) {
                 this.setZeroNegIf(*loc);
             }else{
@@ -374,7 +451,7 @@ class CPU {
             ubyte val = *this.system.access(addr);
             this.setStatus(CC.NEGATIVE, cast(bool)(val & 0b1000_0000));
             this.setStatus(CC.OVERFLOW, cast(bool)(val & 0b0100_0000));
-            this.setZeroIf(cast(byte)(val & this.A));
+            this.setZeroIf(val & this.A);
         });
 
     }
@@ -385,15 +462,15 @@ class CPU {
             debug disassemble ~= " $" ~ format("%.2X%.2X",
                     (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
             ushort addr = 0;
-            this.addMicroOp({ addr |= uNextOp(); });
-            this.addMicroOp({ addr |= (uNextOp() << 8); this.pc = addr; });
+            this.addMicroOp({ addr |= nextOp(); });
+            this.addMicroOp({ addr |= (nextOp() << 8); this.pc = addr; });
             break;
         case Mem.ABSOLUTE:
             ushort addr = 0;
             debug disassemble ~= " $" ~ format("%.2X%.2X",
                     (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
-            this.addMicroOp({ addr |= uNextOp(); });
-            this.addMicroOp({ addr |= (uNextOp() << 8); });
+            this.addMicroOp({ addr |= nextOp(); });
+            this.addMicroOp({ addr |= (nextOp() << 8); });
             this.addMicroOp({ this.pc = *this.system.access(addr); });
             break;
         case Mem.ZEROPAGE:
@@ -401,16 +478,20 @@ class CPU {
         }
     }
 
-    void load(byte* loc, Mem type) {
+    void load(ubyte* loc, Mem type) {
         final switch (type) {
         case Mem.IMMEDIATE:
             debug disassemble ~= " #$" ~ format("%.2X", (*system.access(this.pc)));
             this.addMicroOp({ this.setZeroNegIf(*loc = nextOp()); });
             break;
         case Mem.ABSOLUTE:
+            debug {
+                ubyte low = *system.access(this.pc);
+                ubyte high = *system.access(cast(ushort)(this.pc+1));
+                ushort tot = low | (high << 8);
+                disassemble ~= " $" ~ format("%.4X = %.2X", tot, *system.access(tot));
+            }
             ushort addr = 0;
-            debug disassemble ~= " $" ~ format("%.2X%.2X",
-                    (*system.access(cast(ushort)(this.pc + 1))), (*system.access(this.pc)));
             this.addMicroOp({ addr |= nextOp(); });
             this.addMicroOp({ addr |= (nextOp() << 8); });
             this.addMicroOp({
@@ -461,14 +542,19 @@ class CPU {
         }
     }
 
-    void compare(byte* loc, Mem type) {
+    void add(ubyte* loc, Mem type) {
         final switch (type) {
         case Mem.IMMEDIATE:
             debug disassemble ~= " #$" ~ format("%.2X", (*system.access(this.pc)));
             this.addMicroOp({
-                byte b = nextOp();
-                this.setZeroNegIf(cast(byte)(*loc - b));
-                this.setStatus(CC.CARRY, !cast(bool)((cast(int)*loc - cast(int) b) & 0xFFFFFF00));
+                ubyte b = nextOp();
+                uint val = *loc + b + (this.CCR & 1);
+                ubyte fin = cast(ubyte)val;
+                this.setZeroNegIf(fin);
+                this.setStatus(CC.CARRY, val > 0xFF);
+                this.setStatus(CC.OVERFLOW, 
+                        !((*loc ^ b) & 0x80) && ((*loc ^ (val)) & 0x80)); 
+                *loc = fin;
             });
             break;
         case Mem.ABSOLUTE:
@@ -478,12 +564,68 @@ class CPU {
         }
     }
 
-    void store(byte* loc, Mem type) {
+    void subtract(ubyte* loc, Mem type) {
+        final switch (type) {
+        case Mem.IMMEDIATE:
+            debug disassemble ~= " #$" ~ format("%.2X", (*system.access(this.pc)));
+            this.addMicroOp({
+                ubyte b = nextOp();
+                int val = (cast(byte)*loc) - b - (getStatus(CC.CARRY) ? 0 : 1);
+                ubyte fin = val & 0xFF;
+                this.setZeroNegIf(fin);
+                this.setStatus(CC.CARRY, *loc >= b); // XXX: idk
+                this.setStatus(CC.OVERFLOW, val * (cast(byte)fin) < 0);
+                *loc = fin;
+            });
+            break;
+        case Mem.ABSOLUTE:
+            assert(0); // unimplemented
+        case Mem.ZEROPAGE:
+            assert(0); // unimplemented
+        }
+    }
+
+    void increment(ubyte* loc, int amount) {
+        this.addMicroOp({
+            this.setZeroNegIf(*loc += amount);
+        });
+    }
+
+    void compare(ubyte* loc, Mem type) {
+        final switch (type) {
+        case Mem.IMMEDIATE:
+            debug disassemble ~= " #$" ~ format("%.2X", (*system.access(this.pc)));
+            this.addMicroOp({
+                ubyte b = nextOp();
+                int val = *loc - b;
+                ubyte fin = cast(ubyte)val;
+                this.setZeroNegIf(fin);
+                this.setStatus(CC.CARRY, *loc >= b); // XXX: idk
+            });
+            break;
+        case Mem.ABSOLUTE:
+            assert(0); // unimplemented
+        case Mem.ZEROPAGE:
+            assert(0); // unimplemented
+        }
+    }
+
+    void store(ubyte* loc, Mem type) {
         final switch (type) {
         case Mem.IMMEDIATE:
             assert(0); // I don't think this is a thing
         case Mem.ABSOLUTE:
-            assert(0); // unimplemented
+            ushort addr = 0;
+            debug disassemble ~= " $" ~ format("%.4X = %.2X",
+                    ((*system.access(cast(ushort)(this.pc+1))<<8) 
+                     | *system.access(this.pc)), 
+                    *system.access(cast(ushort)((
+                                *system.access(cast(ushort)(this.pc+1))<<8) |
+                                *system.access(this.pc))));
+            this.addMicroOp({ addr |= nextOp(); });
+            this.addMicroOp({ addr |= (nextOp() << 8); });
+            this.addMicroOp({ *this.system.access(addr) = *loc; });
+            break;
         case Mem.ZEROPAGE:
             ushort addr = 0;
             debug disassemble ~= " $" ~ format("%.2X = %.2X",
@@ -492,9 +634,13 @@ class CPU {
             this.addMicroOp({ *this.system.access(addr) = *loc; });
         }
     }
+    
+    void transfer(ubyte* from, ubyte* to) {
+        this.addMicroOp({ this.setZeroNegIf(*to = *from); });
+    }
 
     void branchIf(CC flag, bool ifSet) {
-        byte disp;
+        ubyte disp;
         ushort og_pc;
         bool shouldJump;
 

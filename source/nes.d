@@ -61,7 +61,7 @@ class NES{
     }}}+/
         ubyte* access(ushort loc) {
             if (loc < 0x2000) { // values stored in ram
-                return &(cpu.ram[loc % 0x800]);
+                return &cpu.ram[loc % 0x800];
             }
             else if (loc < 0x4000) {
                 //return this.ppu.accessMem(loc % 8);
