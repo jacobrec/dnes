@@ -45,6 +45,7 @@ class CPU {
         ABSOLUTE,
         ZEROPAGE,
         INDIRECT_X,
+        INDIRECT_Y,
     }
 
     ushort pc; // The program counter
@@ -209,10 +210,18 @@ class CPU {
             debug disassemble ~= "ORA";
             this.or(getMem(Mem.ABSOLUTE));
             break;
+        case 0x0E: // (14) ASL - absolute
+            debug disassemble ~= "ASL";
+            this.shift(getMem(Mem.ABSOLUTE), /+left+/ true);
+            break;
 
         case 0x10: // (16) BPL - zero page
             debug disassemble ~= "BPL";
             this.branchIf(CC.NEGATIVE, /+isSet+/ false);
+            break;
+        case 0x11: // (17) ORA - indirect y
+            debug disassemble ~= "ORA";
+            this.or(getMem(Mem.INDIRECT_Y));
             break;
         case 0x18: // (24) CLC - implied
             debug disassemble ~= "CLC";
@@ -259,10 +268,18 @@ class CPU {
             debug disassemble ~= "AND";
             this.and(getMem(Mem.ABSOLUTE));
             break;
+        case 0x2E: // (46) ROL - absolute
+            debug disassemble ~= "ROL";
+            this.rotate(getMem(Mem.ABSOLUTE), /+left+/ true);
+            break;
 
         case 0x30: // (48) BMI - relative
             debug disassemble ~= "BMI";
             this.branchIf(CC.NEGATIVE, /+isSet+/ true);
+            break;
+        case 0x31: // (49) AND - indirect y
+            debug disassemble ~= "AND";
+            this.and(getMem(Mem.INDIRECT_Y));
             break;
         case 0x38: // (56) SEC - implied
             debug disassemble ~= "SEC";
@@ -305,10 +322,18 @@ class CPU {
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.ABSOLUTE));
             break;
+        case 0x4E: // (74) LSR - absolute
+            debug disassemble ~= "LSR";
+            this.shift(getMem(Mem.ABSOLUTE), /+left+/ false);
+            break;
 
         case 0x50: // (80) BVC - relative
             debug disassemble ~= "BVC";
             this.branchIf(CC.OVERFLOW, /+isSet+/ false);
+            break;
+        case 0x51: // (81) EOR - indirect y
+            debug disassemble ~= "EOR";
+            this.xor(getMem(Mem.INDIRECT_Y));
             break;
 
         case 0x60: // (96) RTS - implied
@@ -343,10 +368,18 @@ class CPU {
             debug disassemble ~= "ADC";
             this.add(&this.A, getMem(Mem.ABSOLUTE));
             break;
+        case 0x6E: // (110) ROR - absolute
+            debug disassemble ~= "ROR";
+            this.rotate(getMem(Mem.ABSOLUTE), /+left+/ false);
+            break;
 
         case 0x70: // (112) BVS - relative
             debug disassemble ~= "BVS";
             this.branchIf(CC.OVERFLOW, /+isSet+/ true);
+            break;
+        case 0x71: // (113) ADC - indirect y
+            debug disassemble ~= "ADC";
+            this.add(&this.A, getMem(Mem.INDIRECT_Y));
             break;
         case 0x78: // (120) SEI - implied
             debug disassemble ~= "SEI";
@@ -452,17 +485,21 @@ class CPU {
             this.load(&this.X, getMem(Mem.ABSOLUTE));
             break;
 
-        case 0xBA: // (1186) TSX - implied
-            debug disassemble ~= "TSX";
-            this.transfer(&this.sp, &this.X);
-            break;
         case 0xB0: // (176) BCS - relative
             debug disassemble ~= "BCS";
             this.branchIf(CC.CARRY, /+isSet+/ true);
             break;
+        case 0xB1: // (177) LDA - indirect y
+            debug disassemble ~= "LDA";
+            this.load(&this.A, getMem(Mem.INDIRECT_Y));
+            break;
         case 0xB8: // (184) CLV - implied
             debug disassemble ~= "CLV";
             this.addMicroOp({ setStatus(CC.OVERFLOW, false); });
+            break;
+        case 0xBA: // (186) TSX - implied
+            debug disassemble ~= "TSX";
+            this.transfer(&this.sp, &this.X);
             break;
 
         case 0xC0: // (192) CPY - immediate
@@ -497,9 +534,17 @@ class CPU {
             debug disassemble ~= "DEX";
             this.increment(&this.X, -1);
             break;
+        case 0xCC: // (204) CPY - absolute
+            debug disassemble ~= "CPY";
+            this.compare(&this.Y, getMem(Mem.ABSOLUTE));
+            break;
         case 0xCD: // (205) CMP - absolute
             debug disassemble ~= "CMP";
             this.compare(&this.A, getMem(Mem.ABSOLUTE));
+            break;
+        case 0xCE: // (206) DEC - absolute
+            debug disassemble ~= "DEC";
+            this.increment(getMem(Mem.ABSOLUTE), -1);
             break;
 
         case 0xD0: // (208) BNE - relative
@@ -542,6 +587,18 @@ class CPU {
         case 0xEA: // (234) NOP - implied
             debug disassemble ~= "NOP";
             this.addMicroOp({  });
+            break;
+        case 0xEC: // (228) CPX - absolute
+            debug disassemble ~= "CPX";
+            this.compare(&this.X, getMem(Mem.ABSOLUTE));
+            break;
+        case 0xED: // (237) SBC - absolute
+            debug disassemble ~= "SBC";
+            this.subtract(&this.A, getMem(Mem.ABSOLUTE));
+            break;
+        case 0xEE: // (238) INC - absolute
+            debug disassemble ~= "INC";
+            this.increment(getMem(Mem.ABSOLUTE), 1);
             break;
 
         case 0xF0: // (240) BEQ - relative
@@ -684,7 +741,7 @@ class CPU {
     }
 
     void rotateOrShift(ubyte* mem, bool left, bool useCarry) {
-        if (mem != &this.A) {
+        if (!isRegister(mem)) {
             this.addMicroOp({  });
             this.addMicroOp({  });
         }
@@ -791,33 +848,49 @@ class CPU {
 
         case Mem.ZEROPAGE:
             ushort addr = nextOp();
-            debug disassemble ~= " $" ~ format("%.2X = %.2X", addr, *system.access(addr));
             this.addMicroOp({  });
+            debug disassemble ~= " $" ~ format("%.2X = %.2X", addr, *system.access(addr));
             return this.system.access(addr);
 
         case Mem.ABSOLUTE:
             ubyte low = nextOp();
+            this.addMicroOp({  });
             ubyte high = nextOp();
             ushort addr = low | (high << 8);
+            this.addMicroOp({  });
             debug {
                 disassemble ~= " $" ~ format("%.4X = %.2X", addr, *system.access(addr));
             }
-            this.addMicroOp({  });
-            this.addMicroOp({  });
             return this.system.access(addr);
 
         case Mem.INDIRECT_X:
             ubyte low = nextOp();
+            this.addMicroOp({  });
             ubyte preaddr = cast(ubyte)(low + this.X);
+            this.addMicroOp({  });
             ushort addr = *system.access(preaddr) | (*system.access(++preaddr) << 8);
+            this.addMicroOp({  });
+            this.addMicroOp({  });
             debug {
                 disassemble ~= format(" ($%.2X,X) @ %.2X = %.4X = %.2X", low,
                         --preaddr, addr, *system.access(addr));
             }
+            return this.system.access(addr);
+
+        case Mem.INDIRECT_Y:
+            ubyte low = nextOp();
+            this.addMicroOp({  });
+            ushort addr = cast(ushort)((*system.access(low) 
+                        | (*system.access(++low) << 8)) + this.Y);
             this.addMicroOp({  });
             this.addMicroOp({  });
-            this.addMicroOp({  });
-            this.addMicroOp({  });
+            debug {
+                disassemble ~= format(" ($%.2X),Y = %.4X @ %.4X = %.2X", --low,
+                        cast(ushort)(addr-this.Y), addr, *system.access(addr));
+            }
+            if(this.Y + ((addr-this.Y) & 0xFF) > 0xFF){ // extra op if page cross
+                this.addMicroOp({  });
+            }
             return this.system.access(addr);
         }
     }
