@@ -19,6 +19,7 @@ class CPU {
 
     // Bit order is 76543210
     //              NV BDIZC
+
     // (C)arry
     // (Z)ero
     // (I)nterrupt enabled
@@ -178,6 +179,10 @@ class CPU {
             debug disassemble ~= "ORA";
             this.or(getMem(Mem.IMMEDIATE));
             break;
+        case 0x0A: // (10) ASL - accumulator
+            debug disassemble ~= "ASL A";
+            this.shift(&this.A, /+left+/true);
+            break;
         case 0x10: // (16) BPL - zero page
             debug disassemble ~= "BPL";
             this.branchIf(CC.NEGATIVE, /+isSet+/ false);
@@ -198,13 +203,13 @@ class CPU {
             debug disassemble ~= "PLP";
             this.pop(&this.CCR);
             break;
-        case 0x30: // (48) BMI - relative
-            debug disassemble ~= "BMI";
-            this.branchIf(CC.NEGATIVE, /+isSet+/ true);
-            break;
         case 0x29: // (41) AND - immediate
             debug disassemble ~= "AND";
             this.and(getMem(Mem.IMMEDIATE));
+            break;
+        case 0x30: // (48) BMI - relative
+            debug disassemble ~= "BMI";
+            this.branchIf(CC.NEGATIVE, /+isSet+/ true);
             break;
         case 0x38: // (56) SEC - implied
             debug disassemble ~= "SEC";
@@ -221,6 +226,10 @@ class CPU {
         case 0x49: // (73) EOR - immediate
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.IMMEDIATE));
+            break;
+        case 0x4A: // (74) LSR - accumulator
+            debug disassemble ~= "LSR A";
+            this.shift(&this.A, /+left+/false);
             break;
         case 0x4C: // (76) JMP - immediate
             debug disassemble ~= "JMP";
@@ -497,10 +506,15 @@ class CPU {
         this.addMicroOp({ this.setZeroNegIf(this.A ^= *mem); });
     }
 
-    void shift(ubyte* mem, byte amount) { // left is negative
+    void shift(ubyte* mem, bool left) { // left is negative
         this.addMicroOp({
-            setStatus(CC.CARRY, cast(bool)(*mem & 1));
-            setZeroNegIf(*mem >>= amount);
+            if(left){
+                setStatus(CC.CARRY, cast(bool)(*mem & 0x80));
+                setZeroNegIf(*mem <<= 1);
+            } else{
+                setStatus(CC.CARRY, cast(bool)(*mem & 1));
+                setZeroNegIf(*mem >>= 1);
+            }
         });
     }
 
