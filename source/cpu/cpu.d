@@ -177,6 +177,14 @@ class CPU {
         ubyte op = cast(ubyte) nextOp();
 
         switch (op) {
+        case 0x01: // (1) ORA - indirect x
+            debug disassemble ~= "ORA";
+            this.or(getMem(Mem.INDIRECT_X));
+            break;
+        case 0x05: // (5) ORA - zero page
+            debug disassemble ~= "ORA";
+            this.or(getMem(Mem.ZEROPAGE));
+            break;
         case 0x08: // (8) PHP - implied
             debug disassemble ~= "PHP";
             this.push(&this.CCR);
@@ -203,9 +211,17 @@ class CPU {
             debug disassemble ~= "JSR";
             this.call();
             break;
+        case 0x21: // (33) AND - indirect x
+            debug disassemble ~= "AND";
+            this.and(getMem(Mem.INDIRECT_X));
+            break;
         case 0x24: // (36) BIT - zero page
             debug disassemble ~= "BIT";
             this.testBitInMemoryWithAccumulator();
+            break;
+        case 0x25: // (37) AND - zero page
+            debug disassemble ~= "AND";
+            this.and(getMem(Mem.ZEROPAGE));
             break;
         case 0x28: // (40) PLP - implied
             debug disassemble ~= "PLP";
@@ -233,6 +249,14 @@ class CPU {
             debug disassemble ~= "RTI";
             this.returnFromInterrupt();
             break;
+        case 0x41: // (65) EOR - indirect x
+            debug disassemble ~= "EOR";
+            this.xor(getMem(Mem.INDIRECT_X));
+            break;
+        case 0x45: // (69) EOR - zero page
+            debug disassemble ~= "EOR";
+            this.xor(getMem(Mem.ZEROPAGE));
+            break;
         case 0x48: // (72) PHA - implied
             debug disassemble ~= "PHA";
             this.push(&this.A);
@@ -259,6 +283,14 @@ class CPU {
             debug disassemble ~= "RTS";
             this.returnFromSubroutine();
             break;
+        case 0x61: // (97) ADC - indirect x
+            debug disassemble ~= "ADC";
+            this.add(&this.A, getMem(Mem.INDIRECT_X));
+            break;
+        case 0x65: // (101) ADC - zero page
+            debug disassemble ~= "ADC";
+            this.add(&this.A, getMem(Mem.ZEROPAGE));
+            break;
         case 0x68: // (104) PLA - implied
             debug disassemble ~= "PLA";
             this.pop(&this.A);
@@ -281,6 +313,14 @@ class CPU {
             this.addMicroOp({ setStatus(CC.INTERRUPT, true); });
             break;
 
+        case 0x81: // (129) STA - indirect x
+            debug disassemble ~= "STA";
+            this.store(&this.A, getMem(Mem.INDIRECT_X));
+            break;
+        case 0x84: // (132) STY - zero page
+            debug disassemble ~= "STY";
+            this.store(&this.Y, getMem(Mem.ZEROPAGE));
+            break;
         case 0x85: // (133) STA - zero page
             debug disassemble ~= "STA";
             this.store(&this.A, getMem(Mem.ZEROPAGE));
@@ -331,9 +371,17 @@ class CPU {
             debug disassemble ~= "LDX";
             this.load(&this.X, getMem(Mem.IMMEDIATE));
             break;
+        case 0xA4: // (164) LDY - zero page
+            debug disassemble ~= "LDY";
+            this.load(&this.Y, getMem(Mem.ZEROPAGE));
+            break;
         case 0xA5: // (165) LDA - zero page
             debug disassemble ~= "LDA";
             this.load(&this.A, getMem(Mem.ZEROPAGE));
+            break;
+        case 0xA6: // (166) LDX - zero page
+            debug disassemble ~= "LDX";
+            this.load(&this.X, getMem(Mem.ZEROPAGE));
             break;
         case 0xA8: // (168) TAY - implied
             debug disassemble ~= "TAY";
@@ -373,6 +421,18 @@ class CPU {
             debug disassemble ~= "CPY";
             this.compare(&this.Y, getMem(Mem.IMMEDIATE));
             break;
+        case 0xC1: // (193) CMP - indirect x
+            debug disassemble ~= "CMP";
+            this.compare(&this.A, getMem(Mem.INDIRECT_X));
+            break;
+        case 0xC4: // (192) CPY - zero page
+            debug disassemble ~= "CPY";
+            this.compare(&this.Y, getMem(Mem.ZEROPAGE));
+            break;
+        case 0xC5: // (197) CMP - zero page
+            debug disassemble ~= "CMP";
+            this.compare(&this.A, getMem(Mem.ZEROPAGE));
+            break;
         case 0xC8: // (200) INY - implied
             debug disassemble ~= "INY";
             this.increment(&this.Y, 1);
@@ -398,6 +458,18 @@ class CPU {
         case 0xE0: // (224) CPX - immediate
             debug disassemble ~= "CPX";
             this.compare(&this.X, getMem(Mem.IMMEDIATE));
+            break;
+        case 0xE1: // (225) SBC - indirect x
+            debug disassemble ~= "SBC";
+            this.subtract(&this.A, getMem(Mem.INDIRECT_X));
+            break;
+        case 0xE4: // (228) CPX - zero page
+            debug disassemble ~= "CPX";
+            this.compare(&this.X, getMem(Mem.ZEROPAGE));
+            break;
+        case 0xE5: // (229) SBC - zero page
+            debug disassemble ~= "SBC";
+            this.subtract(&this.A, getMem(Mem.ZEROPAGE));
             break;
         case 0xE8: // (232) INX - implied
             debug disassemble ~= "INX";
