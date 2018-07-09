@@ -46,6 +46,7 @@ class CPU {
         ABSOLUTE_X,
         ABSOLUTE_Y,
         ZEROPAGE,
+        ZEROPAGE_X,
         INDIRECT,
         INDIRECT_X,
         INDIRECT_Y,
@@ -292,6 +293,10 @@ class CPU {
             debug disassemble ~= "SEC";
             this.addMicroOp({ setStatus(CC.CARRY, true); });
             break;
+        case 0x39: // (57) AND - absolute y
+            debug disassemble ~= "AND";
+            this.and(getMem(Mem.ABSOLUTE_Y));
+            break;
 
         case 0x40: // (64) RTI - implied
             debug disassemble ~= "RTI";
@@ -341,6 +346,10 @@ class CPU {
         case 0x51: // (81) EOR - indirect y
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.INDIRECT_Y));
+            break;
+        case 0x59: // (89) EOR - absolute y
+            debug disassemble ~= "EOR";
+            this.xor(getMem(Mem.ABSOLUTE_Y));
             break;
 
         case 0x60: // (96) RTS - implied
@@ -396,6 +405,10 @@ class CPU {
             debug disassemble ~= "SEI";
             this.addMicroOp({ setStatus(CC.INTERRUPT, true); });
             break;
+        case 0x79: // (121) ADC - absolute y
+            debug disassemble ~= "ADC";
+            this.add(&this.A, getMem(Mem.ABSOLUTE_Y));
+            break;
 
         case 0x81: // (129) STA - indirect x
             debug disassemble ~= "STA";
@@ -445,6 +458,10 @@ class CPU {
         case 0x98: // (152) TYA - implied
             debug disassemble ~= "TYA";
             this.transfer(&this.Y, &this.A);
+            break;
+        case 0x99: // (153) STA - absolute y
+            debug disassemble ~= "STA";
+            this.store(&this.A, getMem(Mem.ABSOLUTE_Y));
             break;
         case 0x9A: // (154) TXS - implied
             debug disassemble ~= "TXS";
@@ -507,6 +524,10 @@ class CPU {
         case 0xB1: // (177) LDA - indirect y
             debug disassemble ~= "LDA";
             this.load(&this.A, getMem(Mem.INDIRECT_Y));
+            break;
+        case 0xB4: // (180) LDY - zeropage x
+            debug disassemble ~= "LDY";
+            this.load(&this.A, getMem(Mem.ZEROPAGE_X));
             break;
         case 0xB8: // (184) CLV - implied
             debug disassemble ~= "CLV";
@@ -578,6 +599,10 @@ class CPU {
             debug disassemble ~= "CLD";
             this.addMicroOp({ setStatus(CC.DECIMAL, false); });
             break;
+        case 0xD9: // (217) CMP - absolute y
+            debug disassemble ~= "CMP";
+            this.compare(&this.A, getMem(Mem.ABSOLUTE_Y));
+            break;
 
         case 0xE0: // (224) CPX - immediate
             debug disassemble ~= "CPX";
@@ -636,6 +661,11 @@ class CPU {
             debug disassemble ~= "SED";
             this.addMicroOp({ setStatus(CC.DECIMAL, true); });
             break;
+        case 0xF9: // (249) SBC - absolute y
+            debug disassemble ~= "SBC";
+            this.subtract(&this.A, getMem(Mem.ABSOLUTE_Y));
+            break;
+
         default:
             writef("Unimplemented Instruction: 0x%X(%d). PC: %X\n", op, op, this.pc - 1);
             writeln(this);
@@ -939,7 +969,8 @@ class CPU {
         this.addMicroOp({  });
         ubyte high = nextOp();
         ushort addr = low | (high << 8);
-        if(((addr+offset) & 0xFF00) != (addr & 0xFF00)){
+        if(((addr+offset) & 0xFF00) != (addr & 0xFF00)
+                 || (disassemble == "STA" && offset_loc != null)) { // XXX: bad hack
             this.addMicroOp({  });
         }
         addr += offset;
