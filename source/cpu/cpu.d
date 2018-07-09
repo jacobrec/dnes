@@ -527,7 +527,7 @@ class CPU {
             break;
         case 0xB4: // (180) LDY - zeropage x
             debug disassemble ~= "LDY";
-            this.load(&this.A, getMem(Mem.ZEROPAGE_X));
+            this.load(&this.Y, getMem(Mem.ZEROPAGE_X));
             break;
         case 0xB8: // (184) CLV - implied
             debug disassemble ~= "CLV";
@@ -913,6 +913,15 @@ class CPU {
             ushort addr = nextOp();
             this.addMicroOp({  });
             debug disassemble ~= " $" ~ format("%.2X = %.2X", addr, *system.access(addr));
+            return this.system.access(addr);
+        case Mem.ZEROPAGE_X:
+            ubyte addr = nextOp();
+            this.addMicroOp({  });
+            addr += this.X;
+            this.addMicroOp({  });
+            debug disassemble ~= format(" $%.2X,X @ %.2X = %.2X",  
+                    cast(ubyte)(addr - this.X), addr,
+                    *system.access(addr));
             return this.system.access(addr);
 
         case Mem.ABSOLUTE:
