@@ -47,6 +47,7 @@ class CPU {
         ABSOLUTE_Y,
         ZEROPAGE,
         ZEROPAGE_X,
+        ZEROPAGE_Y,
         INDIRECT,
         INDIRECT_X,
         INDIRECT_Y,
@@ -227,6 +228,14 @@ class CPU {
             debug disassemble ~= "ORA";
             this.or(getMem(Mem.INDIRECT_Y));
             break;
+        case 0x15: // (21) ORA - zeropage x
+            debug disassemble ~= "ORA";
+            this.or(getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0x16: // (22) ASL - zeropage x
+            debug disassemble ~= "ASL";
+            this.shift(getMem(Mem.ZEROPAGE_X), /+left+/true);
+            break;
         case 0x18: // (24) CLC - implied
             debug disassemble ~= "CLC";
             this.addMicroOp({ setStatus(CC.CARRY, false); });
@@ -289,6 +298,14 @@ class CPU {
             debug disassemble ~= "AND";
             this.and(getMem(Mem.INDIRECT_Y));
             break;
+        case 0x35: // (53) AND - zeropage x
+            debug disassemble ~= "AND";
+            this.and(getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0x36: // (54) ROL - zeropage x
+            debug disassemble ~= "ROL";
+            this.rotate(getMem(Mem.ZEROPAGE_X), /+left+/true);
+            break;
         case 0x38: // (56) SEC - implied
             debug disassemble ~= "SEC";
             this.addMicroOp({ setStatus(CC.CARRY, true); });
@@ -347,6 +364,14 @@ class CPU {
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.INDIRECT_Y));
             break;
+        case 0x55: // (85) EOR - zeropage x
+            debug disassemble ~= "EOR";
+            this.xor(getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0x56: // (86) LSR - zeropage x
+            debug disassemble ~= "LSR";
+            this.shift(getMem(Mem.ZEROPAGE_X), /+left+/false);
+            break;
         case 0x59: // (89) EOR - absolute y
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.ABSOLUTE_Y));
@@ -401,6 +426,14 @@ class CPU {
             debug disassemble ~= "ADC";
             this.add(&this.A, getMem(Mem.INDIRECT_Y));
             break;
+        case 0x75: // (117) ADC - zeropage x
+            debug disassemble ~= "ADC";
+            this.add(&this.A, getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0x76: // (118) ROR - zeropage x
+            debug disassemble ~= "ROR";
+            this.rotate(getMem(Mem.ZEROPAGE_X), /+left+/false);
+            break;
         case 0x78: // (120) SEI - implied
             debug disassemble ~= "SEI";
             this.addMicroOp({ setStatus(CC.INTERRUPT, true); });
@@ -454,6 +487,14 @@ class CPU {
         case 0x91: // (145) STA - indirect y
             debug disassemble ~= "STA";
             this.store(&this.A, getMem(Mem.INDIRECT_Y));
+            break;
+        case 0x94: // (148) STY - absolute x
+            debug disassemble ~= "STY";
+            this.store(&this.Y, getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0x95: // (149) STA - absolute x
+            debug disassemble ~= "STA";
+            this.store(&this.A, getMem(Mem.ZEROPAGE_X));
             break;
         case 0x98: // (152) TYA - implied
             debug disassemble ~= "TYA";
@@ -529,6 +570,14 @@ class CPU {
             debug disassemble ~= "LDY";
             this.load(&this.Y, getMem(Mem.ZEROPAGE_X));
             break;
+        case 0xB5: // (181) LDA - zeropage x
+            debug disassemble ~= "LDA";
+            this.load(&this.A, getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0xB6: // (182) LDX - zeropage x
+            debug disassemble ~= "LDX";
+            this.load(&this.X, getMem(Mem.ZEROPAGE_Y));
+            break;
         case 0xB8: // (184) CLV - implied
             debug disassemble ~= "CLV";
             this.addMicroOp({ setStatus(CC.OVERFLOW, false); });
@@ -595,6 +644,14 @@ class CPU {
             debug disassemble ~= "CMP";
             this.compare(&this.A, getMem(Mem.INDIRECT_Y));
             break;
+        case 0xD5: // (213) CMP - zeropage x
+            debug disassemble ~= "CMP";
+            this.compare(&this.A, getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0xD6: // (214) DEC - zeropage x
+            debug disassemble ~= "DEC";
+            this.increment(getMem(Mem.ZEROPAGE_X), -1);
+            break;
         case 0xD8: // (216) CLD - implied
             debug disassemble ~= "CLD";
             this.addMicroOp({ setStatus(CC.DECIMAL, false); });
@@ -656,6 +713,14 @@ class CPU {
         case 0xF1: // (241) SBC - indirect y
             debug disassemble ~= "SBC";
             this.subtract(&this.A, getMem(Mem.INDIRECT_Y));
+            break;
+        case 0xF5: // (245) SBC - zeropage x
+            debug disassemble ~= "SBC";
+            this.subtract(&this.A, getMem(Mem.ZEROPAGE_X));
+            break;
+        case 0xF6: // (246) INC - zeropage x
+            debug disassemble ~= "INC";
+            this.increment(getMem(Mem.ZEROPAGE_X), 1);
             break;
         case 0xF8: // (248) SED - relative
             debug disassemble ~= "SED";
@@ -921,6 +986,15 @@ class CPU {
             this.addMicroOp({  });
             debug disassemble ~= format(" $%.2X,X @ %.2X = %.2X",  
                     cast(ubyte)(addr - this.X), addr,
+                    *system.access(addr));
+            return this.system.access(addr);
+        case Mem.ZEROPAGE_Y:
+            ubyte addr = nextOp();
+            this.addMicroOp({  });
+            addr += this.Y;
+            this.addMicroOp({  });
+            debug disassemble ~= format(" $%.2X,Y @ %.2X = %.2X",  
+                    cast(ubyte)(addr - this.Y), addr,
                     *system.access(addr));
             return this.system.access(addr);
 
