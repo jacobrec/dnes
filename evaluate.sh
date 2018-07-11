@@ -12,8 +12,11 @@ head $DNES_OUTPUT -n $LINE > $DNES_OUTPUT_HEAD 2> /dev/null
 
 
 # cmp $EXTERNAL_OUTPUT $DNES_OUTPUT_HEAD -l -b 2> /dev/null
-colordiff --context=1  -d $EXTERNAL_OUTPUT $DNES_OUTPUT_HEAD  2> /dev/null
+OUTPUT=$(colordiff --context=1  -d $EXTERNAL_OUTPUT $DNES_OUTPUT_HEAD  2> /dev/null)
 #git diff -U1 --word-diff --no-index -- $EXTERNAL_OUTPUT $DNES_OUTPUT_HEAD  #| ag -v ^@@
+
+printf "$OUTPUT"
+echo ""
 
 rm $DNES_OUTPUT
 rm $DNES_OUTPUT_HEAD
