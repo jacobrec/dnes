@@ -555,6 +555,10 @@ class CPU {
             debug disassemble ~= "STA";
             this.store(&this.A, getMem(Mem.INDIRECT_X));
             break;
+        case 0x83: // (131) SAX - indirect x
+            debug disassemble ~= "SAX";
+            this.sax(getMem(Mem.INDIRECT_X));
+            break;
         case 0x84: // (132) STY - zero page
             debug disassemble ~= "STY";
             this.store(&this.Y, getMem(Mem.ZEROPAGE));
@@ -566,6 +570,10 @@ class CPU {
         case 0x86: // (134) STX - zero page
             debug disassemble ~= "STX";
             this.store(&this.X, getMem(Mem.ZEROPAGE));
+            break;
+        case 0x87: // (131) SAX - zero page
+            debug disassemble ~= "SAX";
+            this.sax(getMem(Mem.ZEROPAGE));
             break;
         case 0x88: // (136) DEY - implied
             debug disassemble ~= "DEY";
@@ -587,6 +595,10 @@ class CPU {
             debug disassemble ~= "STX";
             this.store(&this.X, getMem(Mem.ABSOLUTE));
             break;
+        case 0x8F: // (143) SAX - absolute
+            debug disassemble ~= "SAX";
+            this.sax(getMem(Mem.ABSOLUTE));
+            break;
 
         case 0x90: // (144) BCC - relative
             debug disassemble ~= "BCC";
@@ -596,17 +608,21 @@ class CPU {
             debug disassemble ~= "STA";
             this.store(&this.A, getMem(Mem.INDIRECT_Y));
             break;
-        case 0x94: // (148) STY - absolute x
+        case 0x94: // (148) STY - zeropage x
             debug disassemble ~= "STY";
             this.store(&this.Y, getMem(Mem.ZEROPAGE_X));
             break;
-        case 0x95: // (149) STA - absolute x
+        case 0x95: // (149) STA - zeropage x
             debug disassemble ~= "STA";
             this.store(&this.A, getMem(Mem.ZEROPAGE_X));
             break;
-        case 0x96: // (150) STX - absolute x
+        case 0x96: // (150) STX - zeropage y
             debug disassemble ~= "STX";
             this.store(&this.X, getMem(Mem.ZEROPAGE_Y));
+            break;
+        case 0x97: // (151) SAX - zeropage y
+            debug disassemble ~= "SAX";
+            this.sax(getMem(Mem.ZEROPAGE_Y));
             break;
         case 0x98: // (152) TYA - implied
             debug disassemble ~= "TYA";
@@ -751,6 +767,10 @@ class CPU {
             debug disassemble ~= "CMP";
             this.compare(&this.A, getMem(Mem.INDIRECT_X));
             break;
+        case 0xC3: // (195) DCP - indirect x
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.INDIRECT_X));
+            break;
         case 0xC4: // (192) CPY - zero page
             debug disassemble ~= "CPY";
             this.compare(&this.Y, getMem(Mem.ZEROPAGE));
@@ -762,6 +782,10 @@ class CPU {
         case 0xC6: // (198) DEC - zero page
             debug disassemble ~= "DEC";
             this.increment(getMem(Mem.ZEROPAGE), -1);
+            break;
+        case 0xC7: // (199) DCP - zeropage
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.ZEROPAGE));
             break;
         case 0xC8: // (200) INY - implied
             debug disassemble ~= "INY";
@@ -787,6 +811,10 @@ class CPU {
             debug disassemble ~= "DEC";
             this.increment(getMem(Mem.ABSOLUTE), -1);
             break;
+        case 0xCF: // (207) DCP - absolute
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.ABSOLUTE));
+            break;
 
         case 0xD0: // (208) BNE - relative
             debug disassemble ~= "BNE";
@@ -795,6 +823,10 @@ class CPU {
         case 0xD1: // (209) CMP - indirect y
             debug disassemble ~= "CMP";
             this.compare(&this.A, getMem(Mem.INDIRECT_Y));
+            break;
+        case 0xD3: // (211) DCP - indirect y
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.INDIRECT_Y));
             break;
         case 0xD4: // (212) NOP - zero page x
             debug disassemble ~= "NOP"; 
@@ -808,6 +840,10 @@ class CPU {
             debug disassemble ~= "DEC";
             this.increment(getMem(Mem.ZEROPAGE_X), -1);
             break;
+        case 0xD7: // (215) DCP - zeropage x
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.ZEROPAGE_X));
+            break;
         case 0xD8: // (216) CLD - implied
             debug disassemble ~= "CLD";
             this.addMicroOp({ setStatus(CC.DECIMAL, false); });
@@ -820,6 +856,10 @@ class CPU {
             debug disassemble ~= "NOP"; 
             this.nop(null, UNOFFICAL);
             break;
+        case 0xDB: // (219) DCP - absolute y
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.ABSOLUTE_Y));
+            break;
         case 0xDC: // (220) NOP - absolute x
             debug disassemble ~= "NOP"; 
             this.nop(getMem(Mem.ABSOLUTE_X), UNOFFICAL);
@@ -831,6 +871,10 @@ class CPU {
         case 0xDE: // (222) DEC - absolute x
             debug disassemble ~= "DEC";
             this.increment(getMem(Mem.ABSOLUTE_X), -1);
+            break;
+        case 0xDF: // (223) DCP - absolute x
+            debug disassemble ~= "DCP";
+            this.dcp(getMem(Mem.ABSOLUTE_X));
             break;
 
         case 0xE0: // (224) CPX - immediate
@@ -864,6 +908,10 @@ class CPU {
         case 0xEA: // (234) NOP - implied
             debug disassemble ~= "NOP"; 
             this.nop(null, OFFICAL);
+            break;
+        case 0xEB: // (233) SBC - immediate
+            debug disassemble ~= "SBC"; debug predisassemble ~= "*";
+            this.subtract(&this.A, getMem(Mem.IMMEDIATE));
             break;
         case 0xEC: // (228) CPX - absolute
             debug disassemble ~= "CPX";
@@ -937,6 +985,21 @@ class CPU {
     void lax(ubyte* mem){
         debug predisassemble ~= "*";
         this.addMicroOp({ setZeroNegIf(this.A = this.X = *mem); });
+    }
+
+    void sax(ubyte* mem){
+        debug predisassemble ~= "*";
+        this.addMicroOp({  *mem = (this.A & this.X); });
+    }
+
+    void dcp(ubyte* mem){
+        debug predisassemble ~= "*";
+        this.increment(mem, -1);
+        this.compare(&this.A, mem);
+
+        // increment and compare occur at the same time, so do one more op
+        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
+        this.addMicroOp({ this.noMicroOp(); this.noMicroOp(); });
     }
 
     // END UNOFFICAL INSTRUCTIONS
