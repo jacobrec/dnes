@@ -1,4 +1,4 @@
-module cpu.cpu;
+module cpu;
 // Imports {{{
 import nes;
 

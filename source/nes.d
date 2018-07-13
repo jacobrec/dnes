@@ -1,11 +1,14 @@
-import cpu.cpu;
+import cpu;
+import ppu;
+
 import cartridge.cartridge;
 import std.conv: text;
+import std.stdio: writeln;
 
 class NES{
     CPU cpu;
     Cartridge cartridge;
-    // PPU ppu;
+    PPU ppu;
     // APU apu;
 
     this(){
@@ -64,17 +67,20 @@ class NES{
                 return &cpu.ram[loc % 0x800];
             }
             else if (loc < 0x4000) {
-                //return this.ppu.accessMem(loc % 8);
+                return this.ppu.accessMem(loc % 8);
                 assert(0);
             }
             else if (loc < 0x4020) {
                 // apu stuff
+                writeln("STOPPING: APU is not yet implemented");
                 assert(0);
             }
             else if (loc < 0x6000) {
+                writeln("STOPPING: idk what this is for (1)");
                 assert(0);
             }
             else if (loc < 0x8000) {
+                writeln("STOPPING: idk what this is for (2)");
                 assert(0);
             }
             else {

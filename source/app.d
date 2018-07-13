@@ -7,7 +7,7 @@ void main() {
 
     NES system = new NES();
 
-    system.insertCartridge(loadROM("roms/nestest.nes"));
+    system.insertCartridge(loadROM("roms/dk.nes"));
     system.reset();
 
     for(;;){
