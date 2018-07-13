@@ -199,6 +199,10 @@ class CPU {
             debug disassemble ~= "ORA";
             this.or(getMem(Mem.INDIRECT_X));
             break;
+        case 0x03: // (3) SLO - indirect x
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.INDIRECT_X));
+            break;
         case 0x04: // (4) NOP - zero page
             debug disassemble ~= "NOP"; 
             this.nop(getMem(Mem.ZEROPAGE), UNOFFICAL);
@@ -210,6 +214,10 @@ class CPU {
         case 0x06: // (6) ASL - zero page
             debug disassemble ~= "ASL";
             this.shift(getMem(Mem.ZEROPAGE), LEFT);
+            break;
+        case 0x07: // (7) SLO - zero page
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.ZEROPAGE));
             break;
         case 0x08: // (8) PHP - implied
             debug disassemble ~= "PHP";
@@ -235,6 +243,10 @@ class CPU {
             debug disassemble ~= "ASL";
             this.shift(getMem(Mem.ABSOLUTE), LEFT);
             break;
+        case 0x0F: // (15) SLO - absolute
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.ABSOLUTE));
+            break;
 
         case 0x10: // (16) BPL - zero page
             debug disassemble ~= "BPL";
@@ -243,6 +255,10 @@ class CPU {
         case 0x11: // (17) ORA - indirect y
             debug disassemble ~= "ORA";
             this.or(getMem(Mem.INDIRECT_Y));
+            break;
+        case 0x13: // (19) SLO - indirect y
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.INDIRECT_Y));
             break;
         case 0x14: // (20) NOP - zero page x
             debug disassemble ~= "NOP"; 
@@ -256,6 +272,10 @@ class CPU {
             debug disassemble ~= "ASL";
             this.shift(getMem(Mem.ZEROPAGE_X), LEFT);
             break;
+        case 0x17: // (23) SLO - zeropage x
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.ZEROPAGE_X));
+            break;
         case 0x18: // (24) CLC - implied
             debug disassemble ~= "CLC";
             this.addMicroOp({ setStatus(CC.CARRY, false); });
@@ -268,6 +288,10 @@ class CPU {
             debug disassemble ~= "NOP"; 
             this.nop(null, UNOFFICAL);
             break;
+        case 0x1B: // (27) SLO - absolute y
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.ABSOLUTE_Y));
+            break;
         case 0x1C: // (28) NOP - absolute x
             debug disassemble ~= "NOP"; 
             this.nop(getMem(Mem.ABSOLUTE_X), UNOFFICAL);
@@ -279,6 +303,10 @@ class CPU {
         case 0x1E: // (30) ASL - absolute x
             debug disassemble ~= "ASL";
             this.shift(getMem(Mem.ABSOLUTE_X), LEFT);
+            break;
+        case 0x1F: // (31) SLO - absolute x
+            debug disassemble ~= "SLO";
+            this.slo(getMem(Mem.ABSOLUTE_X));
             break;
 
         case 0x20: // (32) JSR - implied
@@ -1038,6 +1066,16 @@ class CPU {
         // increment and subtract occur at the same time, so do one more op
         // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
         this.addMicroOp({ this.setStatus(CC.OVERFLOW, false); this.noMicroOp(); this.noMicroOp(); });
+    }
+
+    void slo(ubyte* mem){
+        debug predisassemble ~= "*";
+        this.shift(mem, LEFT);
+        this.or(mem);
+
+        // increment and compare occur at the same time, so do one more op
+        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
+        this.addMicroOp({ this.noMicroOp(); this.noMicroOp(); });
     }
 
     // END UNOFFICAL INSTRUCTIONS
