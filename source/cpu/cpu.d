@@ -84,6 +84,14 @@ class CPU {
         this.cycles--;
     }
 
+    void joinLastMicroOp(){
+        void delegate() op2 = this.opline.back();
+        this.opline.removeBack();
+        void delegate() op1 = this.opline.back();
+        this.opline.removeBack();
+        this.opline.insertBack({ op1(); op2(); });
+    }
+
     void doMicroOp() {
         this.opline.front()();
         this.opline.removeFront();
@@ -435,6 +443,10 @@ class CPU {
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.INDIRECT_X));
             break;
+        case 0x43: // (67) SRE - indirect x
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.INDIRECT_X));
+            break;
         case 0x44: // (68) NOP - zero page
             debug disassemble ~= "NOP"; 
             this.nop(getMem(Mem.ZEROPAGE), UNOFFICAL);
@@ -446,6 +458,10 @@ class CPU {
         case 0x46: // (70) LSR - zero page
             debug disassemble ~= "LSR";
             this.shift(getMem(Mem.ZEROPAGE), RIGHT);
+            break;
+        case 0x47: // (71) SRE - zero page
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.ZEROPAGE));
             break;
         case 0x48: // (72) PHA - implied
             debug disassemble ~= "PHA";
@@ -471,6 +487,10 @@ class CPU {
             debug disassemble ~= "LSR";
             this.shift(getMem(Mem.ABSOLUTE), RIGHT);
             break;
+        case 0x4F: // (75) SRE - absolute
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.ABSOLUTE));
+            break;
 
         case 0x50: // (80) BVC - relative
             debug disassemble ~= "BVC";
@@ -479,6 +499,10 @@ class CPU {
         case 0x51: // (81) EOR - indirect y
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.INDIRECT_Y));
+            break;
+        case 0x53: // (83) SRE - indirect y
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.INDIRECT_Y));
             break;
         case 0x54: // (84) NOP - zero page x
             debug disassemble ~= "NOP"; 
@@ -492,6 +516,10 @@ class CPU {
             debug disassemble ~= "LSR";
             this.shift(getMem(Mem.ZEROPAGE_X), RIGHT);
             break;
+        case 0x57: // (87) SRE - zeropage x
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.ZEROPAGE_X));
+            break;
         case 0x59: // (89) EOR - absolute y
             debug disassemble ~= "EOR";
             this.xor(getMem(Mem.ABSOLUTE_Y));
@@ -499,6 +527,10 @@ class CPU {
         case 0x5A: // (90) NOP - implied
             debug disassemble ~= "NOP"; 
             this.nop(null, UNOFFICAL);
+            break;
+        case 0x5B: // (91) SRE - absoulte y
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.ABSOLUTE_Y));
             break;
         case 0x5C: // (92) NOP - absolute x
             debug disassemble ~= "NOP"; 
@@ -511,6 +543,10 @@ class CPU {
         case 0x5E: // (94) LSR - absolute x
             debug disassemble ~= "LSR";
             this.shift(getMem(Mem.ABSOLUTE_X), RIGHT);
+            break;
+        case 0x5F: // (95) SRE - absolute x
+            debug disassemble ~= "SRE";
+            this.sre(getMem(Mem.ABSOLUTE_X));
             break;
 
         case 0x60: // (96) RTS - implied
@@ -1091,9 +1127,9 @@ class CPU {
         this.increment(mem, 1);
         this.subtract(&this.A, mem);
 
-        // increment and subtract occur at the same time, so do one more op
-        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
-        this.addMicroOp({ this.setStatus(CC.OVERFLOW, false); this.noMicroOp(); this.noMicroOp(); });
+        this.addMicroOp({ this.setStatus(CC.OVERFLOW, false); });
+        this.joinLastMicroOp();
+        this.joinLastMicroOp();
     }
 
     void slo(ubyte* mem){
@@ -1101,9 +1137,7 @@ class CPU {
         this.shift(mem, LEFT);
         this.or(mem);
 
-        // increment and compare occur at the same time, so do one more op
-        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
-        this.addMicroOp({ this.noMicroOp(); this.noMicroOp(); });
+        this.joinLastMicroOp();
     }
 
     void rla(ubyte* mem){
@@ -1111,9 +1145,15 @@ class CPU {
         this.rotate(mem, LEFT);
         this.and(mem);
 
-        // increment and compare occur at the same time, so do one more op
-        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
-        this.addMicroOp({ this.noMicroOp(); this.noMicroOp(); });
+        this.joinLastMicroOp();
+    }
+
+    void sre(ubyte* mem){
+        debug predisassemble ~= "*";
+        this.shift(mem, RIGHT);
+        this.xor(mem);
+
+        this.joinLastMicroOp();
     }
 
     // END UNOFFICAL INSTRUCTIONS
@@ -1335,18 +1375,14 @@ class CPU {
         this.addMicroOp({
             if (shouldJump) {
                 pc = ((pc & 0xFF) + disp) | (pc & 0xFF00);
-                og_pc += disp;
             }
             else {
                 this.noMicroOp();
             }
         });
         this.addMicroOp({
-            if (og_pc == pc || !shouldJump) {
+            if ((0xFF00 & og_pc) == (0xFF00 & pc) || !shouldJump) {
                 this.noMicroOp();
-            }
-            else {
-                pc = og_pc;
             }
         });
     }
