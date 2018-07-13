@@ -885,6 +885,10 @@ class CPU {
             debug disassemble ~= "SBC";
             this.subtract(&this.A, getMem(Mem.INDIRECT_X));
             break;
+        case 0xE3: // (227) ISB - indirect x
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.INDIRECT_X));
+            break;
         case 0xE4: // (228) CPX - zero page
             debug disassemble ~= "CPX";
             this.compare(&this.X, getMem(Mem.ZEROPAGE));
@@ -896,6 +900,10 @@ class CPU {
         case 0xE6: // (230) INC - zero page
             debug disassemble ~= "INC";
             this.increment(getMem(Mem.ZEROPAGE), 1);
+            break;
+        case 0xE7: // (231) ISB - zero page
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.ZEROPAGE));
             break;
         case 0xE8: // (232) INX - implied
             debug disassemble ~= "INX";
@@ -925,6 +933,10 @@ class CPU {
             debug disassemble ~= "INC";
             this.increment(getMem(Mem.ABSOLUTE), 1);
             break;
+        case 0xEF: // (239) ISB - absolute
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.ABSOLUTE));
+            break;
 
         case 0xF0: // (240) BEQ - relative
             debug disassemble ~= "BEQ";
@@ -933,6 +945,10 @@ class CPU {
         case 0xF1: // (241) SBC - indirect y
             debug disassemble ~= "SBC";
             this.subtract(&this.A, getMem(Mem.INDIRECT_Y));
+            break;
+        case 0xF3: // (243) ISB - indirect y
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.INDIRECT_Y));
             break;
         case 0xF4: // (244) NOP - zero page x
             debug disassemble ~= "NOP"; 
@@ -946,6 +962,10 @@ class CPU {
             debug disassemble ~= "INC";
             this.increment(getMem(Mem.ZEROPAGE_X), 1);
             break;
+        case 0xF7: // (247) ISB - zeropage x
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.ZEROPAGE_X));
+            break;
         case 0xF8: // (248) SED - relative
             debug disassemble ~= "SED";
             this.addMicroOp({ setStatus(CC.DECIMAL, true); });
@@ -958,6 +978,10 @@ class CPU {
             debug disassemble ~= "NOP"; 
             this.nop(null, UNOFFICAL);
             break;
+        case 0xFB: // (251) ISB - absolute y
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.ABSOLUTE_Y));
+            break;
         case 0xFC: // (252) NOP - absolute x
             debug disassemble ~= "NOP"; 
             this.nop(getMem(Mem.ABSOLUTE_X), UNOFFICAL);
@@ -969,6 +993,10 @@ class CPU {
         case 0xFE: // (254) INC - absolute x
             debug disassemble ~= "INC";
             this.increment(getMem(Mem.ABSOLUTE_X), 1);
+            break;
+        case 0xFF: // (255) ISB - absolute x
+            debug disassemble ~= "ISB";
+            this.isb(getMem(Mem.ABSOLUTE_X));
             break;
 
         default:
@@ -1000,6 +1028,16 @@ class CPU {
         // increment and compare occur at the same time, so do one more op
         // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
         this.addMicroOp({ this.noMicroOp(); this.noMicroOp(); });
+    }
+
+    void isb(ubyte* mem){
+        debug predisassemble ~= "*";
+        this.increment(mem, 1);
+        this.subtract(&this.A, mem);
+
+        // increment and subtract occur at the same time, so do one more op
+        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
+        this.addMicroOp({ this.setStatus(CC.OVERFLOW, false); this.noMicroOp(); this.noMicroOp(); });
     }
 
     // END UNOFFICAL INSTRUCTIONS
