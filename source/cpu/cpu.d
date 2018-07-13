@@ -317,6 +317,10 @@ class CPU {
             debug disassemble ~= "AND";
             this.and(getMem(Mem.INDIRECT_X));
             break;
+        case 0x23: // (35) RLA - indirect x
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.INDIRECT_X));
+            break;
         case 0x24: // (36) BIT - zero page
             debug disassemble ~= "BIT";
             this.testBitInMemoryWithAccumulator(getMem(Mem.ZEROPAGE));
@@ -328,6 +332,10 @@ class CPU {
         case 0x26: // (38) ROL - zero page
             debug disassemble ~= "ROL";
             this.rotate(getMem(Mem.ZEROPAGE), LEFT);
+            break;
+        case 0x27: // (39) RLA - zero page
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.ZEROPAGE));
             break;
         case 0x28: // (40) PLP - implied
             debug disassemble ~= "PLP";
@@ -353,6 +361,10 @@ class CPU {
             debug disassemble ~= "ROL";
             this.rotate(getMem(Mem.ABSOLUTE), LEFT);
             break;
+        case 0x2F: // (45) RLA - absolute
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.ABSOLUTE));
+            break;
 
         case 0x30: // (48) BMI - relative
             debug disassemble ~= "BMI";
@@ -361,6 +373,10 @@ class CPU {
         case 0x31: // (49) AND - indirect y
             debug disassemble ~= "AND";
             this.and(getMem(Mem.INDIRECT_Y));
+            break;
+        case 0x33: // (49) RLA - indirect y
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.INDIRECT_Y));
             break;
         case 0x34: // (20) NOP - zero page x
             debug disassemble ~= "NOP"; 
@@ -374,6 +390,10 @@ class CPU {
             debug disassemble ~= "ROL";
             this.rotate(getMem(Mem.ZEROPAGE_X), LEFT);
             break;
+        case 0x37: // (54) RLA - zeropage x
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.ZEROPAGE_X));
+            break;
         case 0x38: // (56) SEC - implied
             debug disassemble ~= "SEC";
             this.addMicroOp({ setStatus(CC.CARRY, true); });
@@ -386,6 +406,10 @@ class CPU {
             debug disassemble ~= "NOP"; 
             this.nop(null, UNOFFICAL);
             break;
+        case 0x3B: // (59) RLA - absolute y
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.ABSOLUTE_Y));
+            break;
         case 0x3C: // (60) NOP - absolute x
             debug disassemble ~= "NOP"; 
             this.nop(getMem(Mem.ABSOLUTE_X), UNOFFICAL);
@@ -397,6 +421,10 @@ class CPU {
         case 0x3E: // (62) ROL - absolute x
             debug disassemble ~= "ROL";
             this.rotate(getMem(Mem.ABSOLUTE_X), LEFT);
+            break;
+        case 0x3F: // (63) RLA - absolute x
+            debug disassemble ~= "RLA";
+            this.rla(getMem(Mem.ABSOLUTE_X));
             break;
 
         case 0x40: // (64) RTI - implied
@@ -1072,6 +1100,16 @@ class CPU {
         debug predisassemble ~= "*";
         this.shift(mem, LEFT);
         this.or(mem);
+
+        // increment and compare occur at the same time, so do one more op
+        // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
+        this.addMicroOp({ this.noMicroOp(); this.noMicroOp(); });
+    }
+
+    void rla(ubyte* mem){
+        debug predisassemble ~= "*";
+        this.rotate(mem, LEFT);
+        this.and(mem);
 
         // increment and compare occur at the same time, so do one more op
         // TODO: make them acctually occur at the same time, as opposed to doing an extra op after
