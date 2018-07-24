@@ -30,4 +30,8 @@ class Mapper0: Mapper{
             }
         }
     }
+
+    override const(ubyte*) accessCHR(ushort loc){
+        return &cart.PRGs[0][loc % 0x2000];
+    }
 }

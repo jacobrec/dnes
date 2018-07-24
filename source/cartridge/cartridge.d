@@ -8,6 +8,7 @@ import cartridge.mapper0;
 
 immutable int KB = 1024;
 class Cartridge{
+    MirroringMode mode; // Which mode 
     const(ubyte)[][] CHRs;
     const(ubyte)[][] PRGs;
     const(ubyte)[][] RAMs;
@@ -32,6 +33,7 @@ class Cartridge{
 
 abstract class Mapper{
     abstract const(ubyte*) access(ushort loc);
+    abstract const(ubyte*) accessCHR(ushort loc);
 }
 
 enum MirroringMode { Vertical, Horizontal, FourScreen }
@@ -70,6 +72,7 @@ Cartridge loadROM(string filepath){
     }
 
     Cartridge c = new Cartridge();
+    c.mode = ines.mode;
     if(ines.hasTrainer){
         c.trainer = getBytes(512);
     }

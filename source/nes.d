@@ -1,5 +1,6 @@
 import cpu;
 import ppu;
+import graphics;
 
 import cartridge.cartridge;
 import std.conv: text;
@@ -10,9 +11,12 @@ class NES{
     Cartridge cartridge;
     PPU ppu;
     // APU apu;
+    Renderer screen;
 
     this(){
         cpu = new CPU(this);
+        ppu = new PPU(this);
+        screen = new TerminalRenderer();
     }
     void insertCartridge(Cartridge cart){
         this.cartridge = cart;
@@ -26,7 +30,9 @@ class NES{
     }
     
     void tick(){
+        ppu.tick(); ppu.tick(); ppu.tick();
         cpu.tick();
+        screen.render(ppu.screen);
     }
 
 
@@ -68,7 +74,6 @@ class NES{
             }
             else if (loc < 0x4000) {
                 return this.ppu.accessMem(loc % 8);
-                assert(0);
             }
             else if (loc < 0x4020) {
                 // apu stuff

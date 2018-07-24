@@ -167,8 +167,7 @@ class CPU {
 
         //TODO: make this an interrupt
         this.pc = read16(system.access(0xFFFC));
-        this.pc = 0xC000;
-        //writef("Starting at: 0x%X\n", this.pc);
+        writef("Starting at: 0x%X\n", this.pc);
     }
 
     ubyte nextOp(bool print = true) {
@@ -184,25 +183,30 @@ class CPU {
     string ops;
     string disassemble;
     string predisassemble;
-    void readInstruction() {
-        debug {
-            if (!first) {
-                writef(rightPad(ops, 10-cast(ubyte)predisassemble.length));
-                writef(predisassemble);
-                writef(rightPad(disassemble, 32));
-                writef(regs);
-            }
-            regs = format("A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X CYC:%3d\n", A,
-                    X, Y, CCR, sp, (cycles * 3) % 341);
-            first = false;
-            ops = "";
-            disassemble = "";
-            predisassemble = "";
-            writef("%.4X  ", this.pc);
+    void printDebugInfo(){
+        if (!first) {
+            writef(rightPad(ops, 10-cast(ubyte)predisassemble.length));
+            writef(predisassemble);
+            writef(rightPad(disassemble, 32));
+            writef(regs);
         }
+        regs = format("A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X CYC:%3d\n", A,
+                X, Y, CCR, sp, (cycles * 3) % 341);
+        first = false;
+        ops = "";
+        disassemble = "";
+        predisassemble = "";
+        writef("%.4X  ", this.pc);
+    }
+    void readInstruction() {
+        //debug printDebugInfo();
         ubyte op = cast(ubyte) nextOp();
 
         switch (op) {
+        case 0x00: // (0) BRK - implied
+            debug disassemble ~= "BRK";
+            this.brk();
+            break;
         case 0x01: // (1) ORA - indirect x
             debug disassemble ~= "ORA";
             this.or(getMem(Mem.INDIRECT_X));
@@ -1193,6 +1197,33 @@ class CPU {
     }
 
     // END UNOFFICAL INSTRUCTIONS
+
+    /+
+ 891   Instructions accessing the stack
+ 892
+ 893      BRK
+ 894
+ 895         #  address R/W description
+ 896        --- ------- --- -----------------------------------------------
+ 897         1    PC     R  fetch opcode, increment PC
+ 898         2    PC     R  read next instruction byte (and throw it away),
+ 899                        increment PC
+ 900         3  $0100,S  W  push PCH on stack (with B flag set), decrement S
+ 901         4  $0100,S  W  push PCL on stack, decrement S
+ 902         5  $0100,S  W  push P on stack, decrement S
+ 903         6   $FFFE   R  fetch PCL
+ 904         7   $FFFF   R  fetch PCH
+ +/
+    void brk(){
+        this.addMicroOp({ nextOp(); });
+        this.addMicroOp({  stackPush((pc & 0xFF00) >> 8); });
+        this.addMicroOp({  stackPush(pc & 0xFF); });
+        this.addMicroOp({  stackPush(this.CCR); });
+        this.addMicroOp({ pc = (pc & 0xFF00) | (*system.access(0xFFFE)); });
+        this.addMicroOp({ pc = (*system.access(0xFFFF) << 8) | (pc & 0x00FF); });
+    }
+
+
     void nop(ubyte* mem, bool isOffical){
         debug {
             if(!isOffical)
@@ -1518,17 +1549,19 @@ class CPU {
         }
         addr += offset;
         this.addMicroOp({  });
+
+        ubyte* ptr = system.access(addr);
         debug {
             if (offset_loc == null) {
-                disassemble ~= format(" $%.4X = %.2X", addr, *system.access(addr));
+                disassemble ~= format(" $%.4X = %.2X", addr, *ptr);
             }
             else {
                 string var = offset_loc == &this.X ? "X" : "Y";
                 disassemble ~= format(" $%.4X,%s @ %.4X = %.2X",
-                        cast(ushort)(addr - offset), var, addr, *system.access(addr));
+                        cast(ushort)(addr - offset), var, addr, *ptr);
             }
         }
-        return this.system.access(addr);
+        return ptr;
 
     }
 
